@@ -188,9 +188,12 @@ def analyze(root: Path, config: AnalysisConfig) -> Report:
         semhash = SemHash.from_records(records=records, columns=["text"], model=model)
         neighbors = semhash.index.query_threshold(semhash.index.vectors, threshold=config.threshold)
         graph: dict[int, list[tuple[int, float]]] = defaultdict(list)
-        for source, row in enumerate(neighbors):
+        indexed_items = semhash.index.items
+        for row_number, row in enumerate(neighbors):
             if not row:
                 continue
+            source_record = indexed_items[row_number][0]
+            source = SemHashRecord.model_validate(source_record).index
             for record, score in row:
                 target = SemHashRecord.model_validate(record).index
                 if source == target:
