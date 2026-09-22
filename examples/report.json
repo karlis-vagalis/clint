@@ -1,0 +1,12 @@
+{
+  "files_scanned": 2,
+  "blocks_scanned": 4,
+  "total_tokens": 31,
+  "exact_duplicate_percentage": 0.0,
+  "semantic_redundancy_percentage": 0.32,
+  "context_redundancy": 0.32,
+  "estimated_unique_tokens": 21,
+  "estimated_redundant_tokens": 10,
+  "estimated_context_token_savings": 10,
+  "clusters": []
+}
