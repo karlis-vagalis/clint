@@ -14,7 +14,7 @@ uv run clint ./skills --json > report.json
 uv run clint ./skills --fail-above 0.10
 ```
 
-`skillcheck` is also installed as a compatibility alias. The command exits with `1` when `--fail-above` is exceeded and `2` for invalid input/errors.
+The command exits with `1` when `--fail-above` is exceeded and `2` for invalid input/errors.
 
 ### Stronger semantic matching
 
