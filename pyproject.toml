@@ -8,6 +8,7 @@ license = { text = "MIT" }
 authors = [{ name = "clint contributors" }]
 dependencies = [
     "pydantic>=2.13.5",
+    "rich>=15.0.0",
     "semhash>=0.4.1",
     "typer>=0.27.2",
 ]

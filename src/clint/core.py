@@ -36,14 +36,12 @@ class AnalysisConfig:
     min_block_tokens: int = 10
     extensions: frozenset[str] = frozenset({".md", ".txt"})
     model: str | None = None
-    canonical_paths: tuple[str, ...] = ()
 
 
 @dataclass
 class Cluster:
     blocks: list[Block]
     similarity: float
-    canonical: Block
     exact: bool = False
 
     @property
@@ -52,7 +50,7 @@ class Cluster:
 
     @property
     def redundant_tokens(self) -> int:
-        return self.total_tokens - self.canonical.tokens
+        return self.total_tokens - min(block.tokens for block in self.blocks)
 
 
 @dataclass
@@ -147,14 +145,6 @@ def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
     return blocks
 
 
-def choose_canonical(blocks: list[Block], configured: tuple[str, ...]) -> Block:
-    def score(block: Block) -> tuple[int, int, int, str]:
-        configured_score = 1 if any(block.path.startswith(prefix) for prefix in configured) else 0
-        return (configured_score, block.tokens, -len(block.path), block.path)
-
-    return max(blocks, key=score)
-
-
 class SemHashRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -231,7 +221,6 @@ def analyze(root: Path, config: AnalysisConfig) -> Report:
                 Cluster(
                     matched,
                     min(scores, default=1.0),
-                    choose_canonical(matched, config.canonical_paths),
                     exact,
                 )
             )

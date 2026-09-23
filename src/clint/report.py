@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+from rich.console import Console
+from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
 
 from .core import Cluster, Report
 
@@ -26,13 +31,10 @@ class ClusterOutput(BaseModel):
     number: int
     similarity: float
     exact: bool
-    canonical: str
     total_tokens: int
-    canonical_tokens: int
-    redundant_tokens: int
-    potential_saving: float
+    estimated_redundant_tokens: int
+    estimated_saving: float
     blocks: list[BlockOutput]
-    suggested_action: str
 
 
 class ReportOutput(BaseModel):
@@ -52,15 +54,14 @@ class ReportOutput(BaseModel):
 
 def cluster_output(cluster: Cluster, number: int) -> ClusterOutput:
     total_tokens = cluster.total_tokens
+    redundant_tokens = cluster.redundant_tokens
     return ClusterOutput(
         number=number,
         similarity=round(cluster.similarity, 4),
         exact=cluster.exact,
-        canonical=cluster.canonical.location,
         total_tokens=total_tokens,
-        canonical_tokens=cluster.canonical.tokens,
-        redundant_tokens=cluster.redundant_tokens,
-        potential_saving=cluster.redundant_tokens / total_tokens if total_tokens else 0,
+        estimated_redundant_tokens=redundant_tokens,
+        estimated_saving=redundant_tokens / total_tokens if total_tokens else 0,
         blocks=[
             BlockOutput(
                 file=block.path,
@@ -73,11 +74,21 @@ def cluster_output(cluster: Cluster, number: int) -> ClusterOutput:
             )
             for block in cluster.blocks
         ],
-        suggested_action="Keep canonical; replace other occurrences with references.",
     )
 
 
-def output_model(report: Report) -> ReportOutput:
+def output_model(report: Report, limit: int | None = None) -> ReportOutput:
+    ordered_clusters = sorted(
+        report.clusters,
+        key=lambda cluster: (
+            -cluster.redundant_tokens,
+            -cluster.similarity,
+            cluster.blocks[0].path,
+            cluster.blocks[0].start_line,
+        ),
+    )
+    if limit is not None:
+        ordered_clusters = ordered_clusters[:limit]
     return ReportOutput(
         files_scanned=report.files_scanned,
         blocks_scanned=report.blocks_scanned,
@@ -89,46 +100,70 @@ def output_model(report: Report) -> ReportOutput:
         estimated_redundant_tokens=report.redundant_tokens,
         estimated_context_token_savings=report.redundant_tokens,
         clusters=[
-            cluster_output(cluster, index) for index, cluster in enumerate(report.clusters, 1)
+            cluster_output(cluster, index) for index, cluster in enumerate(ordered_clusters, 1)
         ],
     )
 
 
-def as_dict(report: Report) -> dict[str, Any]:
-    return output_model(report).model_dump(mode="json")
+def as_dict(report: Report, limit: int | None = None) -> dict[str, Any]:
+    return output_model(report, limit=limit).model_dump(mode="json")
 
 
-def render(report: Report) -> str:
-    data = output_model(report)
-    lines = [
-        "clint — instruction redundancy report",
-        "=" * 40,
-        f"Files scanned:                 {data.files_scanned}",
-        f"Blocks scanned:                {data.blocks_scanned}",
-        f"Total tokens:                  {data.total_tokens}",
-        f"Exact duplicate percentage:    {data.exact_duplicate_percentage:.1%}",
-        f"Semantic redundancy percentage: {data.semantic_redundancy_percentage:.1%}",
-        f"Estimated unique tokens:        {data.estimated_unique_tokens}",
-        f"Estimated redundant tokens:     {data.estimated_redundant_tokens}",
-        f"Potential context-token saving: {data.estimated_context_token_savings}",
-    ]
+def render(report: Report, limit: int | None = None) -> str:
+    data = output_model(report, limit=limit)
+    stream = StringIO()
+    console = Console(
+        file=stream,
+        force_terminal=False,
+        color_system=None,
+        width=100,
+        highlight=False,
+    )
+    console.print(Rule("clint · instruction redundancy report", style="bright_blue"))
+
+    summary = Table(show_header=False, box=None, padding=(0, 2))
+    summary.add_column("Metric", style="cyan")
+    summary.add_column("Value", justify="right")
+    summary.add_row("Files scanned", str(data.files_scanned))
+    summary.add_row("Blocks scanned", str(data.blocks_scanned))
+    summary.add_row("Total word tokens", f"{data.total_tokens:,}")
+    summary.add_row("Exact duplicate share", f"{data.exact_duplicate_percentage:.1%}")
+    summary.add_row("Semantic redundancy", f"{data.semantic_redundancy_percentage:.1%}")
+    summary.add_row("Estimated unique tokens", f"{data.estimated_unique_tokens:,}")
+    summary.add_row("Estimated redundant tokens", f"{data.estimated_redundant_tokens:,}")
+    summary.add_row("Potential context-token savings", f"{data.estimated_context_token_savings:,}")
+    console.print(summary)
+
     for cluster in data.clusters:
-        lines.extend(["", f"Cluster #{cluster.number}", f"Similarity: {cluster.similarity:.2f}"])
-        for block in cluster.blocks:
-            lines.extend([f"\n{block.file}:{block.start_line}-{block.end_line}", f'"{block.text}"'])
-        lines.extend(
-            [
-                "",
-                f"Total tokens:      {cluster.total_tokens}",
-                f"Canonical tokens:  {cluster.canonical_tokens}",
-                f"Redundant tokens:  {cluster.redundant_tokens}",
-                f"Potential saving:  {cluster.potential_saving:.1%}",
-                f"Suggested canonical: {cluster.canonical}",
-                f"Suggested action: {cluster.suggested_action}",
-            ]
+        console.print()
+        console.print(
+            Rule(
+                f"Cluster #{cluster.number} · similarity {cluster.similarity:.2f}"
+                f" · {'exact' if cluster.exact else 'semantic'}",
+                style="bright_blue",
+            )
         )
-    return "\n".join(lines)
+        for block in cluster.blocks:
+            if block.start_line == block.end_line:
+                location = f"{block.file}:{block.start_line}"
+            else:
+                location = f"{block.file}:{block.start_line}-{block.end_line}"
+            console.print(Text(location, style="bold cyan"))
+            if block.heading:
+                console.print(Text(f"  Section: {block.heading}", style="dim"))
+            for offset, line in enumerate(block.text.splitlines()):
+                console.print(Text(f"{block.start_line + offset:>5} │ {line}"))
+
+        cluster_stats = Table(show_header=False, box=None, padding=(0, 2))
+        cluster_stats.add_column("Metric", style="dim")
+        cluster_stats.add_column("Value", justify="right")
+        cluster_stats.add_row("Tokens in cluster", str(cluster.total_tokens))
+        cluster_stats.add_row("Estimated redundant tokens", str(cluster.estimated_redundant_tokens))
+        cluster_stats.add_row("Estimated savings", f"{cluster.estimated_saving:.1%}")
+        console.print(cluster_stats)
+
+    return stream.getvalue().rstrip()
 
 
-def render_json(report: Report) -> str:
-    return json.dumps(as_dict(report), indent=2, ensure_ascii=False)
+def render_json(report: Report, limit: int | None = None) -> str:
+    return json.dumps(as_dict(report, limit=limit), indent=2, ensure_ascii=False)
