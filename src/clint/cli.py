@@ -12,6 +12,7 @@ from .core import (
     AnalysisConfig,
     SortCategory,
     SortOrder,
+    SplitMode,
     analyze,
 )
 from .report import render, render_json
@@ -157,6 +158,10 @@ def scan(
     min_block_tokens: Annotated[
         int, typer.Option("--min-block-tokens", min=1, help="Ignore shorter blocks.")
     ] = 10,
+    split_mode: Annotated[
+        SplitMode,
+        typer.Option("--split", help="Block splitting mode: auto, paragraph, or markdown."),
+    ] = SplitMode.AUTO,
     limit: Annotated[
         int | None, typer.Option("--limit", min=1, help="Maximum number of clusters to display.")
     ] = None,
@@ -190,6 +195,7 @@ def scan(
             AnalysisConfig(
                 threshold=threshold,
                 min_block_tokens=min_block_tokens,
+                split_mode=split_mode,
                 model=model,
             ),
         )

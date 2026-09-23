@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [{ name = "Karlis Vagalis", email = "karlis.vagalis@gmail.com" }]
 dependencies = [
+    "markdown-it-py[plugins]>=4.2.0",
     "pydantic>=2.13.5",
     "rich>=15.0.0",
     "semhash>=0.4.1",

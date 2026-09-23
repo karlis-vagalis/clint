@@ -12,6 +12,7 @@ uv run clint ./skills
 uv run clint ./skills ./rules/AGENTS.md
 uv run clint './skills/**/*.md' './prompts/*.txt'
 uv run clint ./skills --threshold 0.90 --min-block-tokens 10
+uv run clint ./skills --split markdown
 uv run clint ./skills --output json > report.json
 uv run clint ./skills --limit 10
 uv run clint ./skills -s asc similarity
@@ -38,8 +39,9 @@ SemHash and Model2Vec run locally on CPU. No API, LLM, vector database, server, 
 ## What it scans
 
 - Accepts one or more file paths, directories, or glob patterns; recursively scans `.md` and `.txt` files and de-duplicates overlapping matches.
-- Splits files into paragraphs using blank lines as the only block boundary, regardless of Markdown headings or list syntax.
-- Preserves the original paragraph text and file line range; it does not interpret sections or rule IDs.
+- By default (`--split auto`), uses Markdown block boundaries for `.md` files and blank-line paragraph splitting for other supported text files. Markdown blocks include paragraphs (including list and blockquote paragraphs), fenced/indented code, HTML blocks, and tables. Headings and front matter are not treated as instruction blocks.
+- Use `--split paragraph` to force blank-line splitting, or `--split markdown` to force Markdown parsing.
+- All modes preserve original source text and line ranges; none infer sections or rule IDs.
 - Ignores blocks below `--min-block-tokens`.
 - Clusters likely duplicates without modifying source files.
 

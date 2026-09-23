@@ -28,6 +28,8 @@ clint ./skills ./rules/AGENTS.md
 clint './skills/**/*.md' './prompts/*.txt'
 ```
 
+The default `--split auto` mode uses Markdown parsing for `.md` files and blank-line paragraph splitting for other supported text files. Markdown boundaries include paragraphs (including list and blockquote paragraphs), fenced/indented code, HTML blocks, and tables; headings and front matter are not treated as instruction blocks. Use `--split paragraph` to force blank-line splitting or `--split markdown` to force Markdown parsing.
+
 The default output is readable terminal text. Use JSON when the user or a downstream script needs structured output:
 
 ```bash
@@ -36,6 +38,7 @@ clint ./skills --output json
 
 Useful controls:
 
+- `--split auto|paragraph|markdown`: Choose extension-aware, blank-line, or Markdown-aware block boundaries. `auto` is the default.
 - `-t` / `--threshold`: SemHash similarity threshold from 0 to 1 (default `0.90`).
 - `--min-block-tokens`: Ignore shorter paragraphs (default `10`).
 - `--limit N`: Show only the first N clusters; corpus summary metrics still cover the full scan.
@@ -53,7 +56,7 @@ Use a ratio such as `0.10`, not a percentage such as `10`.
 
 ## Interpret results carefully
 
-- Text scanning splits on blank lines only. It does not parse Markdown structure: headings, bullets, and fenced code are ordinary paragraph text, and there is no inferred section metadata.
+- Auto mode uses Markdown parsing for `.md` files and paragraph splitting otherwise. Paragraph mode splits on blank lines only. Markdown mode uses parser-provided line maps and recognizes paragraphs, code blocks, HTML blocks, and tables; headings and front matter are skipped, and no section metadata is inferred.
 - Each occurrence gives a file and line range plus the original paragraph text. Use these locations to inspect the actual source before judging a match.
 - Similarity clusters are candidates, not proof that two rules are interchangeable. Review negation, scope, conditions, exceptions, and procedural context; semantically similar instructions can still differ in an important constraint.
 - Token savings are estimates based on word counts. Per-cluster redundant tokens assume keeping the shortest occurrence; this is a potential-savings estimate, not a recommendation to keep that particular wording or a tokenizer-accurate context measurement.

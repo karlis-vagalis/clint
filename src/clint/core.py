@@ -9,6 +9,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
 
+from markdown_it import MarkdownIt
+from mdit_py_plugins.front_matter import front_matter_plugin
 from pydantic import BaseModel, ConfigDict, Field
 
 WORD_RE = re.compile(r"[\w][\w'-]*", re.UNICODE)
@@ -39,11 +41,18 @@ class SortCategory(StrEnum):
     ESTIMATED_SAVINGS = "estimated-savings"
 
 
+class SplitMode(StrEnum):
+    AUTO = "auto"
+    PARAGRAPH = "paragraph"
+    MARKDOWN = "markdown"
+
+
 class AnalysisConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     threshold: float = Field(default=0.90, ge=0.0, le=1.0)
     min_block_tokens: int = Field(default=10, ge=1)
+    split_mode: SplitMode = SplitMode.AUTO
     extensions: frozenset[str] = frozenset({".md", ".txt"})
     model: str | None = None
 
@@ -142,9 +151,20 @@ def scan_paths(roots: Sequence[Path], extensions: frozenset[str]) -> tuple[list[
     return sorted(discovered), display_root
 
 
-def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
-    """Split any plain-text file into non-empty paragraphs separated by blank lines."""
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+def parse_file(
+    path: Path,
+    root: Path,
+    min_tokens: int,
+    split_mode: SplitMode = SplitMode.AUTO,
+) -> list[Block]:
+    """Split a file into blocks using blank lines or Markdown block boundaries."""
+    source = path.read_text(encoding="utf-8", errors="replace")
+    lines = source.splitlines()
+    if split_mode is SplitMode.MARKDOWN or (
+        split_mode is SplitMode.AUTO and path.suffix.lower() == ".md"
+    ):
+        return parse_markdown(path, root, lines, source, min_tokens)
+
     blocks: list[Block] = []
     pending: list[str] = []
     start = 0
@@ -173,6 +193,37 @@ def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
                 start = index
             pending.append(line)
     flush(len(lines) - 1)
+    return blocks
+
+
+def parse_markdown(
+    path: Path,
+    root: Path,
+    lines: list[str],
+    source: str,
+    min_tokens: int,
+) -> list[Block]:
+    """Extract Markdown leaf blocks while retaining parser-provided source line ranges."""
+    parser = MarkdownIt("default").use(front_matter_plugin)
+    block_types = {"paragraph_open", "fence", "code_block", "html_block", "table_open"}
+    blocks: list[Block] = []
+    for token in parser.parse(source):
+        if token.type not in block_types or token.map is None:
+            continue
+        start, end = token.map
+        text = "\n".join(lines[start:end]).strip()
+        tokens = token_count(text)
+        if not text or tokens < min_tokens:
+            continue
+        blocks.append(
+            Block(
+                path=str(path.relative_to(root)),
+                start_line=start + 1,
+                end_line=end,
+                text=text,
+                tokens=tokens,
+            )
+        )
     return blocks
 
 
@@ -210,7 +261,9 @@ def analyze(roots: Path | Sequence[Path], config: AnalysisConfig) -> Report:
     inputs = [roots] if isinstance(roots, Path) else list(roots)
     paths, display_root = scan_paths(inputs, config.extensions)
     blocks = [
-        block for path in paths for block in parse_file(path, display_root, config.min_block_tokens)
+        block
+        for path in paths
+        for block in parse_file(path, display_root, config.min_block_tokens, config.split_mode)
     ]
     clusters: list[Cluster] = []
     exact_tokens = 0
