@@ -8,7 +8,12 @@ from typer._click import Context
 from typer.core import TyperArgument, TyperCommand, TyperGroup, TyperOption
 from typer.main import get_command
 
-from .core import AnalysisConfig, analyze
+from .core import (
+    AnalysisConfig,
+    SortCategory,
+    SortOrder,
+    analyze,
+)
 from .report import render, render_json
 
 app = typer.Typer(
@@ -35,14 +40,41 @@ def _command_entry(
     usage_parts = [command_path]
     for parameter in arguments:
         name = (parameter.name or "ARG").upper().replace("_", "-")
+        if parameter.name == "paths":
+            name = "PATH"
         part = f"<{name}>"
+        if parameter.nargs == -1:
+            part += "..."
         usage_parts.append(part if parameter.required else f"[{part}]")
     for parameter in options:
-        flag = next(
-            (option for option in parameter.opts if option.startswith("--")),
-            parameter.opts[0],
+        long_flag = next((option for option in parameter.opts if option.startswith("--")), None)
+        short_flag = next(
+            (
+                option
+                for option in parameter.opts
+                if option.startswith("-") and not option.startswith("--")
+            ),
+            None,
         )
-        value = "" if parameter.is_flag else f" <{(parameter.name or 'VALUE').replace('_', '-')}>"
+        flag = (
+            f"{short_flag}/{long_flag}"
+            if short_flag and long_flag
+            else long_flag or parameter.opts[0]
+        )
+        value_types = getattr(parameter.type, "types", None)
+        if value_types:
+            value_parts = []
+            for index, value_type in enumerate(value_types):
+                choices = getattr(value_type, "choices", None)
+                label = "|".join(str(choice) for choice in choices) if choices else ""
+                if not label:
+                    label = "order" if index == 0 else "category"
+                value_parts.append(f"<{label}>")
+            value = " " + " ".join(value_parts)
+        elif parameter.is_flag:
+            value = ""
+        else:
+            value = f" <{(parameter.name or 'VALUE').replace('_', '-')}>"
         part = f"{flag}{value}"
         usage_parts.append(part if parameter.required else f"[{part}]")
     usage = " ".join(usage_parts)
@@ -52,6 +84,7 @@ def _command_entry(
             "name": param.name,
             "kind": "option" if isinstance(param, TyperOption) else "argument",
             "required": param.required,
+            "multiple": isinstance(param, TyperArgument) and param.nargs == -1,
             "help": getattr(param, "help", None),
         }
         if isinstance(param, TyperOption):
@@ -107,7 +140,10 @@ discovery_app.add_typer(self_app, name="self")
 
 @app.command()
 def scan(
-    path: Annotated[Path, typer.Argument(help="File or directory to scan.")],
+    paths: Annotated[
+        list[Path],
+        typer.Argument(help="One or more files, directories, or glob patterns to scan."),
+    ],
     threshold: Annotated[
         float, typer.Option("--threshold", min=0.0, max=1.0, help="SemHash similarity threshold.")
     ] = 0.90,
@@ -131,14 +167,19 @@ def scan(
         typer.Option("--output", help="Output format: text or json."),
     ] = "text",
     model: Annotated[str | None, typer.Option("--model", help="Model2Vec model name/path.")] = None,
+    sort: Annotated[
+        tuple[SortOrder, SortCategory],
+        typer.Option(
+            "--sort",
+            "-s",
+            help="Sort clusters by asc/desc and occurrences, similarity, or estimated-savings.",
+        ),
+    ] = (SortOrder.DESC, SortCategory.ESTIMATED_SAVINGS),
 ) -> None:
-    """Scan a file or directory for redundant instruction blocks."""
-    if not path.exists():
-        typer.echo(f"clint: path does not exist: {path}", err=True)
-        raise typer.Exit(2)
+    """Scan paths, directories, or glob patterns for redundant instruction blocks."""
     try:
         report = analyze(
-            path,
+            paths,
             AnalysisConfig(
                 threshold=threshold,
                 min_block_tokens=min_block_tokens,
@@ -149,7 +190,9 @@ def scan(
         typer.echo(f"clint: {exc}", err=True)
         raise typer.Exit(2) from exc
     typer.echo(
-        render_json(report, limit=limit) if output == "json" else render(report, limit=limit)
+        render_json(report, limit=limit, sort=sort)
+        if output == "json"
+        else render(report, limit=limit, sort=sort)
     )
     if fail_above is not None and report.context_redundancy > fail_above:
         raise typer.Exit(1)

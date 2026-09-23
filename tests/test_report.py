@@ -1,6 +1,14 @@
 from pathlib import Path
 
-from clint.core import AnalysisConfig, Block, Cluster, Report, analyze
+from clint.core import (
+    AnalysisConfig,
+    Block,
+    Cluster,
+    Report,
+    SortCategory,
+    SortOrder,
+    analyze,
+)
 from clint.report import as_dict, render
 
 
@@ -16,6 +24,7 @@ def test_text_report_shows_separated_cluster_and_source_line_numbers(tmp_path: P
     assert "a.md:1" in output
     assert "    1 │ Preserve formatting" in output
     assert "Estimated savings" in output
+    assert output.index("Estimated redundant tokens") < output.index("Occurrences:")
     assert "Suggested" not in output
 
 
@@ -42,6 +51,9 @@ def test_cluster_limit_shows_largest_redundancy_first() -> None:
     assert data["clusters"][0]["blocks"][0]["file"] == "large.md"
     assert data["total_tokens"] == 16
     assert data["estimated_redundant_tokens"] == 8
+
+    ascending = as_dict(report, sort=(SortOrder.ASC, SortCategory.SIMILARITY))["clusters"]
+    assert ascending[0]["similarity"] < ascending[1]["similarity"]
 
 
 def test_json_report_has_no_canonical_or_suggested_actions(tmp_path: Path) -> None:

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import glob
+import os
 import re
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import field
+from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
@@ -30,6 +34,17 @@ class Block:
         return f"{self.path}:{self.start_line}-{self.end_line}"
 
 
+class SortOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+class SortCategory(StrEnum):
+    OCCURRENCES = "occurrences"
+    SIMILARITY = "similarity"
+    ESTIMATED_SAVINGS = "estimated-savings"
+
+
 @dataclass(frozen=True)
 class AnalysisConfig:
     threshold: float = 0.90
@@ -51,6 +66,10 @@ class Cluster:
     @property
     def redundant_tokens(self) -> int:
         return self.total_tokens - min(block.tokens for block in self.blocks)
+
+    @property
+    def estimated_saving(self) -> float:
+        return self.redundant_tokens / self.total_tokens if self.total_tokens else 0.0
 
 
 @dataclass
@@ -94,9 +113,40 @@ def stable_id(text: str) -> str:
     return sha256(normalize(text).encode()).hexdigest()[:12]
 
 
-def scan_paths(root: Path, extensions: frozenset[str]) -> list[Path]:
-    paths = [root] if root.is_file() else [p for p in root.rglob("*") if p.is_file()]
-    return sorted(p for p in paths if p.suffix.lower() in extensions)
+def scan_paths(roots: Sequence[Path], extensions: frozenset[str]) -> tuple[list[Path], Path]:
+    if not roots:
+        raise ValueError("provide at least one file, directory, or glob pattern")
+    discovered: dict[Path, Path] = {}
+    display_bases: list[Path] = []
+    for root in roots:
+        raw = os.fspath(root)
+        has_glob = glob.has_magic(raw)
+        matches = [Path(value) for value in glob.glob(raw, recursive=True)] if has_glob else [root]
+        if not matches or any(not match.exists() for match in matches):
+            raise FileNotFoundError(f"input path or glob did not match: {root}")
+
+        if has_glob:
+            prefix = raw[: min(raw.find(char) for char in "*?[" if char in raw)]
+            base = (
+                Path(prefix).resolve() if prefix.endswith(os.sep) else Path(prefix).parent.resolve()
+            )
+        elif len(matches) == 1 and matches[0].is_dir():
+            base = matches[0].resolve()
+        else:
+            base = matches[0].resolve().parent
+        display_bases.append(base)
+
+        for match in matches:
+            candidates = match.rglob("*") if match.is_dir() else [match]
+            for candidate in candidates:
+                if candidate.is_file() and candidate.suffix.lower() in extensions:
+                    resolved = candidate.resolve()
+                    discovered[resolved] = resolved
+
+    display_root = (
+        display_bases[0] if len(display_bases) == 1 else Path(os.path.commonpath(display_bases))
+    )
+    return sorted(discovered), display_root
 
 
 def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
@@ -152,14 +202,34 @@ class SemHashRecord(BaseModel):
     index: int
 
 
-def analyze(root: Path, config: AnalysisConfig) -> Report:
-    paths = scan_paths(root, config.extensions)
+def sort_clusters(
+    clusters: Sequence[Cluster],
+    order: SortOrder = SortOrder.DESC,
+    category: SortCategory = SortCategory.ESTIMATED_SAVINGS,
+) -> list[Cluster]:
+    tie_sorted = sorted(
+        clusters,
+        key=lambda cluster: (
+            -cluster.redundant_tokens,
+            -cluster.similarity,
+            -len(cluster.blocks),
+            cluster.blocks[0].path,
+            cluster.blocks[0].start_line,
+        ),
+    )
+    value = {
+        SortCategory.OCCURRENCES: lambda cluster: len(cluster.blocks),
+        SortCategory.SIMILARITY: lambda cluster: cluster.similarity,
+        SortCategory.ESTIMATED_SAVINGS: lambda cluster: cluster.redundant_tokens,
+    }[category]
+    return sorted(tie_sorted, key=value, reverse=order is SortOrder.DESC)
+
+
+def analyze(roots: Path | Sequence[Path], config: AnalysisConfig) -> Report:
+    inputs = [roots] if isinstance(roots, Path) else list(roots)
+    paths, display_root = scan_paths(inputs, config.extensions)
     blocks = [
-        block
-        for path in paths
-        for block in parse_file(
-            path, root if root.is_dir() else path.parent, config.min_block_tokens
-        )
+        block for path in paths for block in parse_file(path, display_root, config.min_block_tokens)
     ]
     clusters: list[Cluster] = []
     exact_tokens = 0

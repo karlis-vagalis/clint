@@ -9,9 +9,12 @@ It answers: **how many tokens are consuming context without adding unique inform
 ```bash
 uv sync
 uv run clint ./skills
+uv run clint ./skills ./rules/AGENTS.md
+uv run clint './skills/**/*.md' './prompts/*.txt'
 uv run clint ./skills --threshold 0.90 --min-block-tokens 10
 uv run clint ./skills --output json > report.json
 uv run clint ./skills --limit 10
+uv run clint ./skills -s asc similarity
 uv run clint ./skills --fail-above 0.10
 uv run clint self list
 ```
@@ -34,7 +37,7 @@ SemHash and Model2Vec run locally on CPU. No API, LLM, vector database, server, 
 
 ## What it scans
 
-- Recursively scans `.md` and `.txt` files.
+- Accepts one or more file paths, directories, or glob patterns; recursively scans `.md` and `.txt` files and de-duplicates overlapping matches.
 - Parses paragraphs and list items into blocks, preserving file, line range, heading, original text, and stable rule IDs such as `[GIT-04]`.
 - Ignores blocks below `--min-block-tokens` and intentional references such as `See [GIT-04].`.
 - Clusters likely duplicates without modifying source files.
@@ -43,7 +46,7 @@ Similarity is intentionally configurable because generic phrases can be false po
 
 ## Output formats
 
-Text is the default and uses Rich-formatted summary metrics, cluster separators, `path:start-end` locations, and numbered source lines. Clusters are sorted by estimated redundant tokens (largest first). `--limit N` displays only the first N clusters while keeping corpus-wide metrics unchanged. Linters commonly use this compact location notation with a source code frame; Rich provides readable terminal rendering without introducing a separate diagnostic framework.
+Text is the default and uses Rich-formatted summary metrics, cluster separators, cluster summaries, and an `Occurrences:` section with blank-line-separated `path:start-end` locations and numbered source lines. By default, clusters sort by estimated redundant tokens (largest first); `-s|--sort <asc|desc> <occurrences|similarity|estimated-savings>` selects a different order. `--limit N` displays only the first N clusters while keeping corpus-wide metrics unchanged. Linters commonly use this compact location notation with a source code frame; Rich provides readable terminal rendering without introducing a separate diagnostic framework.
 
 Choose JSON with `--output json`; see [`examples/report.json`](examples/report.json). Top-level fields include `files_scanned`, `blocks_scanned`, `total_tokens`, `exact_duplicate_percentage`, `semantic_redundancy_percentage`, `estimated_unique_tokens`, `estimated_redundant_tokens`, `estimated_context_token_savings`, and `clusters`. Clusters include similarity, all source blocks, and token/savings estimates—no canonical or action suggestions.
 

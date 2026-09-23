@@ -18,6 +18,28 @@ def test_parser_preserves_location_and_ignores_references(tmp_path: Path) -> Non
     assert blocks[0].start_line == 3
 
 
+def test_scan_accepts_multiple_roots_globs_and_deduplicates_matches(tmp_path: Path) -> None:
+    alpha = tmp_path / "alpha"
+    beta = tmp_path / "beta"
+    alpha.mkdir()
+    beta.mkdir()
+    text = "Preserve formatting when editing existing documents in this repository.\n"
+    (alpha / "rules.md").write_text(text)
+    (beta / "extra.txt").write_text(text)
+
+    report = analyze(
+        [alpha / "rules.md", alpha / "*.md", beta / "*.txt"],
+        AnalysisConfig(min_block_tokens=3),
+    )
+
+    assert report.files_scanned == 2
+    assert len(report.clusters) == 1
+    assert {block.path for block in report.clusters[0].blocks} == {
+        "alpha/rules.md",
+        "beta/extra.txt",
+    }
+
+
 def test_analysis_finds_exact_duplicate_and_metrics(tmp_path: Path) -> None:
     (tmp_path / "a.md").write_text(
         "Preserve formatting when editing existing documents in this repository.\n"

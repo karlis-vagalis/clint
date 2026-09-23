@@ -10,7 +10,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .core import Cluster, Report
+from .core import Cluster, Report, SortCategory, SortOrder, sort_clusters
 
 
 class BlockOutput(BaseModel):
@@ -77,16 +77,15 @@ def cluster_output(cluster: Cluster, number: int) -> ClusterOutput:
     )
 
 
-def output_model(report: Report, limit: int | None = None) -> ReportOutput:
-    ordered_clusters = sorted(
-        report.clusters,
-        key=lambda cluster: (
-            -cluster.redundant_tokens,
-            -cluster.similarity,
-            cluster.blocks[0].path,
-            cluster.blocks[0].start_line,
-        ),
-    )
+def output_model(
+    report: Report,
+    limit: int | None = None,
+    sort: tuple[SortOrder, SortCategory] = (
+        SortOrder.DESC,
+        SortCategory.ESTIMATED_SAVINGS,
+    ),
+) -> ReportOutput:
+    ordered_clusters = sort_clusters(report.clusters, order=sort[0], category=sort[1])
     if limit is not None:
         ordered_clusters = ordered_clusters[:limit]
     return ReportOutput(
@@ -105,12 +104,26 @@ def output_model(report: Report, limit: int | None = None) -> ReportOutput:
     )
 
 
-def as_dict(report: Report, limit: int | None = None) -> dict[str, Any]:
-    return output_model(report, limit=limit).model_dump(mode="json")
+def as_dict(
+    report: Report,
+    limit: int | None = None,
+    sort: tuple[SortOrder, SortCategory] = (
+        SortOrder.DESC,
+        SortCategory.ESTIMATED_SAVINGS,
+    ),
+) -> dict[str, Any]:
+    return output_model(report, limit=limit, sort=sort).model_dump(mode="json")
 
 
-def render(report: Report, limit: int | None = None) -> str:
-    data = output_model(report, limit=limit)
+def render(
+    report: Report,
+    limit: int | None = None,
+    sort: tuple[SortOrder, SortCategory] = (
+        SortOrder.DESC,
+        SortCategory.ESTIMATED_SAVINGS,
+    ),
+) -> str:
+    data = output_model(report, limit=limit, sort=sort)
     stream = StringIO()
     console = Console(
         file=stream,
@@ -143,7 +156,19 @@ def render(report: Report, limit: int | None = None) -> str:
                 style="bright_blue",
             )
         )
-        for block in cluster.blocks:
+        cluster_stats = Table(show_header=False, box=None, padding=(0, 2))
+        cluster_stats.add_column("Metric", style="dim")
+        cluster_stats.add_column("Value", justify="right")
+        cluster_stats.add_row("Occurrences", str(len(cluster.blocks)))
+        cluster_stats.add_row("Tokens in cluster", str(cluster.total_tokens))
+        cluster_stats.add_row("Estimated redundant tokens", str(cluster.estimated_redundant_tokens))
+        cluster_stats.add_row("Estimated savings", f"{cluster.estimated_saving:.1%}")
+        console.print(cluster_stats)
+        console.print(Text("Occurrences:", style="bold"))
+
+        for index, block in enumerate(cluster.blocks):
+            if index:
+                console.print()
             if block.start_line == block.end_line:
                 location = f"{block.file}:{block.start_line}"
             else:
@@ -154,16 +179,15 @@ def render(report: Report, limit: int | None = None) -> str:
             for offset, line in enumerate(block.text.splitlines()):
                 console.print(Text(f"{block.start_line + offset:>5} │ {line}"))
 
-        cluster_stats = Table(show_header=False, box=None, padding=(0, 2))
-        cluster_stats.add_column("Metric", style="dim")
-        cluster_stats.add_column("Value", justify="right")
-        cluster_stats.add_row("Tokens in cluster", str(cluster.total_tokens))
-        cluster_stats.add_row("Estimated redundant tokens", str(cluster.estimated_redundant_tokens))
-        cluster_stats.add_row("Estimated savings", f"{cluster.estimated_saving:.1%}")
-        console.print(cluster_stats)
-
     return stream.getvalue().rstrip()
 
 
-def render_json(report: Report, limit: int | None = None) -> str:
-    return json.dumps(as_dict(report, limit=limit), indent=2, ensure_ascii=False)
+def render_json(
+    report: Report,
+    limit: int | None = None,
+    sort: tuple[SortOrder, SortCategory] = (
+        SortOrder.DESC,
+        SortCategory.ESTIMATED_SAVINGS,
+    ),
+) -> str:
+    return json.dumps(as_dict(report, limit=limit, sort=sort), indent=2, ensure_ascii=False)
