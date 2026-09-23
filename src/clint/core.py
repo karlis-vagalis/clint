@@ -5,28 +5,28 @@ import os
 import re
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict, Field
 
 WORD_RE = re.compile(r"[\w][\w'-]*", re.UNICODE)
 
 
-@dataclass(frozen=True)
-class Block:
-    path: str
-    start_line: int
-    end_line: int
-    text: str
-    tokens: int
+class Block(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str = Field(min_length=1)
+    start_line: int = Field(ge=1)
+    end_line: int = Field(ge=1)
+    text: str = Field(min_length=1)
+    tokens: int = Field(gt=0)
 
     @property
     def location(self) -> str:
         return f"{self.path}:{self.start_line}-{self.end_line}"
+
 
 class SortOrder(StrEnum):
     ASC = "asc"
@@ -39,18 +39,20 @@ class SortCategory(StrEnum):
     ESTIMATED_SAVINGS = "estimated-savings"
 
 
-@dataclass(frozen=True)
-class AnalysisConfig:
-    threshold: float = 0.90
-    min_block_tokens: int = 10
+class AnalysisConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    threshold: float = Field(default=0.90, ge=0.0, le=1.0)
+    min_block_tokens: int = Field(default=10, ge=1)
     extensions: frozenset[str] = frozenset({".md", ".txt"})
     model: str | None = None
 
 
-@dataclass
-class Cluster:
-    blocks: list[Block]
-    similarity: float
+class Cluster(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    blocks: list[Block] = Field(min_length=2)
+    similarity: float = Field(ge=0.0, le=1.0)
     exact: bool = False
 
     @property
@@ -66,13 +68,14 @@ class Cluster:
         return self.redundant_tokens / self.total_tokens if self.total_tokens else 0.0
 
 
-@dataclass
-class Report:
-    files_scanned: int
-    blocks_scanned: int
-    total_tokens: int
-    exact_duplicate_tokens: int
-    clusters: list[Cluster] = field(default_factory=list)
+class Report(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    files_scanned: int = Field(ge=0)
+    blocks_scanned: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    exact_duplicate_tokens: int = Field(ge=0)
+    clusters: list[Cluster] = Field(default_factory=list)
 
     @property
     def redundant_tokens(self) -> int:
@@ -154,11 +157,11 @@ def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
             return
         blocks.append(
             Block(
-                str(path.relative_to(root)),
-                start + 1,
-                end + 1,
-                text,
-                token_count(text),
+                path=str(path.relative_to(root)),
+                start_line=start + 1,
+                end_line=end + 1,
+                text=text,
+                tokens=token_count(text),
             )
         )
 
@@ -171,6 +174,7 @@ def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
             pending.append(line)
     flush(len(lines) - 1)
     return blocks
+
 
 class SemHashRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -260,11 +264,15 @@ def analyze(roots: Path | Sequence[Path], config: AnalysisConfig) -> Report:
                 exact_tokens += sum(item.tokens for item in matched[1:])
             clusters.append(
                 Cluster(
-                    matched,
-                    min(scores, default=1.0),
-                    exact,
+                    blocks=matched,
+                    similarity=min(scores, default=1.0),
+                    exact=exact,
                 )
             )
     return Report(
-        len(paths), len(blocks), sum(block.tokens for block in blocks), exact_tokens, clusters
+        files_scanned=len(paths),
+        blocks_scanned=len(blocks),
+        total_tokens=sum(block.tokens for block in blocks),
+        exact_duplicate_tokens=exact_tokens,
+        clusters=clusters,
     )

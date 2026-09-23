@@ -66,4 +66,4 @@ uv run ruff check src
 uv run ty check src
 ```
 
-The project uses Python 3.13+, Pydantic-validated dataclasses and models, and a modular `src/clint` package (parser/scanner, SemHash clustering, metrics, reporting, and Typer CLI). Structured SemHash inputs and JSON report output are validated with Pydantic. It does not automatically edit files.
+The project uses Python 3.13+, Pydantic `BaseModel`s for domain and report models, and a modular `src/clint` package (parser/scanner, SemHash clustering, metrics, reporting, and Typer CLI). Structured SemHash inputs and JSON report output are validated with Pydantic. It does not automatically edit files.
