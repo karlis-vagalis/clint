@@ -145,7 +145,14 @@ def scan(
         typer.Argument(help="One or more files, directories, or glob patterns to scan."),
     ],
     threshold: Annotated[
-        float, typer.Option("--threshold", min=0.0, max=1.0, help="SemHash similarity threshold.")
+        float,
+        typer.Option(
+            "--threshold",
+            "-t",
+            min=0.0,
+            max=1.0,
+            help="SemHash similarity threshold.",
+        ),
     ] = 0.90,
     min_block_tokens: Annotated[
         int, typer.Option("--min-block-tokens", min=1, help="Ignore shorter blocks.")
