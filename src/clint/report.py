@@ -19,10 +19,8 @@ class BlockOutput(BaseModel):
     file: str
     start_line: int
     end_line: int
-    heading: str | None
     text: str
     tokens: int
-    rule_id: str | None
 
 
 class ClusterOutput(BaseModel):
@@ -67,10 +65,8 @@ def cluster_output(cluster: Cluster, number: int) -> ClusterOutput:
                 file=block.path,
                 start_line=block.start_line,
                 end_line=block.end_line,
-                heading=block.heading,
                 text=block.text,
                 tokens=block.tokens,
-                rule_id=block.rule_id,
             )
             for block in cluster.blocks
         ],
@@ -164,7 +160,7 @@ def render(
         cluster_stats.add_row("Estimated redundant tokens", str(cluster.estimated_redundant_tokens))
         cluster_stats.add_row("Estimated savings", f"{cluster.estimated_saving:.1%}")
         console.print(cluster_stats)
-        console.print(Text("Occurrences:", style="bold"))
+        console.print()
 
         for index, block in enumerate(cluster.blocks):
             if index:
@@ -174,8 +170,6 @@ def render(
             else:
                 location = f"{block.file}:{block.start_line}-{block.end_line}"
             console.print(Text(location, style="bold cyan"))
-            if block.heading:
-                console.print(Text(f"  Section: {block.heading}", style="dim"))
             for offset, line in enumerate(block.text.splitlines()):
                 console.print(Text(f"{block.start_line + offset:>5} │ {line}"))
 

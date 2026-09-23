@@ -7,7 +7,6 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import field
 from enum import StrEnum
-from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,8 +14,6 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.dataclasses import dataclass
 
 WORD_RE = re.compile(r"[\w][\w'-]*", re.UNICODE)
-HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?$")
-REFERENCE_RE = re.compile(r"^\s*(?:see|refer to)\s+\[[A-Z][A-Z0-9_-]*\]\.?\s*$", re.I)
 
 
 @dataclass(frozen=True)
@@ -24,15 +21,12 @@ class Block:
     path: str
     start_line: int
     end_line: int
-    heading: str | None
     text: str
     tokens: int
-    rule_id: str | None = None
 
     @property
     def location(self) -> str:
         return f"{self.path}:{self.start_line}-{self.end_line}"
-
 
 class SortOrder(StrEnum):
     ASC = "asc"
@@ -109,10 +103,6 @@ def token_count(text: str) -> int:
     return len(WORD_RE.findall(text))
 
 
-def stable_id(text: str) -> str:
-    return sha256(normalize(text).encode()).hexdigest()[:12]
-
-
 def scan_paths(roots: Sequence[Path], extensions: frozenset[str]) -> tuple[list[Path], Path]:
     if not roots:
         raise ValueError("provide at least one file, directory, or glob pattern")
@@ -150,50 +140,37 @@ def scan_paths(roots: Sequence[Path], extensions: frozenset[str]) -> tuple[list[
 
 
 def parse_file(path: Path, root: Path, min_tokens: int) -> list[Block]:
+    """Split any plain-text file into non-empty paragraphs separated by blank lines."""
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     blocks: list[Block] = []
-    heading: str | None = None
     pending: list[str] = []
     start = 0
 
     def flush(end: int) -> None:
-        nonlocal pending, start
+        nonlocal pending
         text = "\n".join(pending).strip()
         pending = []
-        if not text or token_count(text) < min_tokens or REFERENCE_RE.match(text):
+        if not text or token_count(text) < min_tokens:
             return
-        match = re.search(r"\[([A-Z][A-Z0-9_-]*)\]", text)
         blocks.append(
             Block(
                 str(path.relative_to(root)),
                 start + 1,
                 end + 1,
-                heading,
                 text,
                 token_count(text),
-                match.group(1) if match else None,
             )
         )
 
     for index, line in enumerate(lines):
-        match = HEADING_RE.match(line)
-        is_bullet = bool(re.match(r"^\s*(?:[-*+] |\d+[.)] )", line))
-        if match:
+        if not line.strip():
             flush(index - 1)
-            heading = match.group(1).strip()
-        elif not line.strip():
-            flush(index - 1)
-        elif is_bullet:
-            flush(index - 1)
-            pending, start = [line.strip()], index
-            flush(index)
         else:
             if not pending:
                 start = index
-            pending.append(line.strip())
+            pending.append(line)
     flush(len(lines) - 1)
     return blocks
-
 
 class SemHashRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -257,12 +234,6 @@ def analyze(roots: Path | Sequence[Path], config: AnalysisConfig) -> Report:
             for record, score in row:
                 target = SemHashRecord.model_validate(record).index
                 if source == target:
-                    continue
-                if (
-                    blocks[source].rule_id
-                    and blocks[target].rule_id
-                    and blocks[source].rule_id != blocks[target].rule_id
-                ):
                     continue
                 graph[source].append((target, float(score)))
 

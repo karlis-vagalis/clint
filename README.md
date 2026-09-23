@@ -38,15 +38,16 @@ SemHash and Model2Vec run locally on CPU. No API, LLM, vector database, server, 
 ## What it scans
 
 - Accepts one or more file paths, directories, or glob patterns; recursively scans `.md` and `.txt` files and de-duplicates overlapping matches.
-- Parses paragraphs and list items into blocks, preserving file, line range, heading, original text, and stable rule IDs such as `[GIT-04]`.
-- Ignores blocks below `--min-block-tokens` and intentional references such as `See [GIT-04].`.
+- Splits files into paragraphs using blank lines as the only block boundary, regardless of Markdown headings or list syntax.
+- Preserves the original paragraph text and file line range; it does not interpret sections or rule IDs.
+- Ignores blocks below `--min-block-tokens`.
 - Clusters likely duplicates without modifying source files.
 
 Similarity is intentionally configurable because generic phrases can be false positives. Review clusters before replacing instructions.
 
 ## Output formats
 
-Text is the default and uses Rich-formatted summary metrics, cluster separators, cluster summaries, and an `Occurrences:` section with blank-line-separated `path:start-end` locations and numbered source lines. By default, clusters sort by estimated redundant tokens (largest first); `-s|--sort <asc|desc> <occurrences|similarity|estimated-savings>` selects a different order. `--limit N` displays only the first N clusters while keeping corpus-wide metrics unchanged. Linters commonly use this compact location notation with a source code frame; Rich provides readable terminal rendering without introducing a separate diagnostic framework.
+Text is the default and uses Rich-formatted summary metrics, cluster separators, cluster summaries, then a blank line followed by blank-line-separated `path:start-end` locations and numbered source lines. By default, clusters sort by estimated redundant tokens (largest first); `-s|--sort <asc|desc> <occurrences|similarity|estimated-savings>` selects a different order. `--limit N` displays only the first N clusters while keeping corpus-wide metrics unchanged. Linters commonly use this compact location notation with a source code frame; Rich provides readable terminal rendering without introducing a separate diagnostic framework.
 
 Choose JSON with `--output json`; see [`examples/report.json`](examples/report.json). Top-level fields include `files_scanned`, `blocks_scanned`, `total_tokens`, `exact_duplicate_percentage`, `semantic_redundancy_percentage`, `estimated_unique_tokens`, `estimated_redundant_tokens`, `estimated_context_token_savings`, and `clusters`. Clusters include similarity, all source blocks, and token/savings estimates—no canonical or action suggestions.
 
@@ -61,8 +62,7 @@ This is an estimate, not a tokenizer-specific bill. The initial version counts w
 ## Development
 
 ```bash
-uv run pytest
-uv run ruff check src tests
+uv run ruff check src
 uv run ty check src
 ```
 
