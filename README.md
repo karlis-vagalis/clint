@@ -49,7 +49,7 @@ Similarity is intentionally configurable because generic phrases can be false po
 
 Text is the default and uses Rich-formatted summary metrics, cluster separators, cluster summaries, then a blank line followed by blank-line-separated `path:start-end` locations and numbered source lines. By default, clusters sort by estimated redundant tokens (largest first); `-s|--sort <asc|desc> <occurrences|similarity|estimated-savings>` selects a different order. `--limit N` displays only the first N clusters while keeping corpus-wide metrics unchanged. Linters commonly use this compact location notation with a source code frame; Rich provides readable terminal rendering without introducing a separate diagnostic framework.
 
-Choose JSON with `--output json`; see [`examples/report.json`](examples/report.json). Top-level fields include `files_scanned`, `blocks_scanned`, `total_tokens`, `exact_duplicate_percentage`, `semantic_redundancy_percentage`, `estimated_unique_tokens`, `estimated_redundant_tokens`, `estimated_context_token_savings`, and `clusters`. Clusters include similarity, all source blocks, and token/savings estimates—no canonical or action suggestions.
+Choose JSON with `--output json`. Top-level fields include `files_scanned`, `blocks_scanned`, `total_tokens`, `exact_duplicate_percentage`, `semantic_redundancy_percentage`, `estimated_unique_tokens`, `estimated_redundant_tokens`, `estimated_context_token_savings`, and `clusters`. Clusters include similarity, all source blocks, and token/savings estimates—no canonical or action suggestions.
 
 The savings estimate assumes retaining the shortest occurrence in each cluster; review the source blocks yourself before deciding what to consolidate. `context_redundancy` is token-weighted:
 
@@ -61,7 +61,16 @@ This is an estimate, not a tokenizer-specific bill. The initial version counts w
 
 ## Development
 
+`just build` uses the installed `doxxer` binary to inject the next Git-derived version into `pyproject.toml`, runs `uv build`, then restores the `0.0.0` source placeholder. Install `doxxer` before building.
+
 ```bash
+just build
+```
+
+Install the project and development tools with `uv sync`, then run static checks:
+
+```bash
+uv sync
 uv run ruff check src
 uv run ty check src
 ```
