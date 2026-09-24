@@ -1,5 +1,7 @@
 # semlint
 
+> **AI disclosure:** AI tools were used to assist with code and documentation in this repository. The maintainer reviews changes and is responsible for the project.
+
 `semlint` is a small, local Python CLI for finding redundant information in agent instruction corpora: `SKILL.md`, `AGENTS.md`, prompts, rules, and other Markdown/text files.
 
 It answers: **how many tokens are consuming context without adding unique information, and where are they?**
