@@ -1,5 +1,7 @@
 # semlint
 
+[![skills.sh](https://skills.sh/b/karlis-vagalis/semlint)](https://skills.sh/karlis-vagalis/semlint)
+
 > **AI disclosure:** AI tools were used to assist with code and documentation in this repository. The maintainer reviews changes and is responsible for the project.
 
 `semlint` is a small, local Python CLI for finding redundant information in agent instruction corpora: `SKILL.md`, `AGENTS.md`, prompts, rules, and other Markdown/text files.
