@@ -4,20 +4,34 @@
 
 It answers: **how many tokens are consuming context without adding unique information, and where are they?**
 
+## Install
+
+Install `semlint` as a global command with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install semlint
+```
+
+This makes `semlint` available on your PATH. Upgrade or uninstall it with:
+
+```bash
+uv tool upgrade semlint
+uv tool uninstall semlint
+```
+
 ## Quick start
 
 ```bash
-uv sync
-uv run semlint ./skills
-uv run semlint ./skills ./rules/AGENTS.md
-uv run semlint './skills/**/*.md' './prompts/*.txt'
-uv run semlint ./skills --threshold 0.90 --min-block-tokens 10
-uv run semlint ./skills --split markdown
-uv run semlint ./skills --output json > report.json
-uv run semlint ./skills --limit 10
-uv run semlint ./skills -s asc similarity
-uv run semlint ./skills --fail-above 0.10
-uv run semlint self list
+semlint ./skills
+semlint ./skills ./rules/AGENTS.md
+semlint './skills/**/*.md' './prompts/*.txt'
+semlint ./skills --threshold 0.90 --min-block-tokens 10
+semlint ./skills --split markdown
+semlint ./skills --output json > report.json
+semlint ./skills --limit 10
+semlint ./skills -s asc similarity
+semlint ./skills --fail-above 0.10
+semlint self list
 ```
 
 The command exits with `1` when `--fail-above` is exceeded and `2` for invalid input/errors.
@@ -27,7 +41,7 @@ The command exits with `1` when `--fail-above` is exceeded and `2` for invalid i
 SemHash with local Model2Vec embeddings is the default semantic engine. It loads its small CPU model on first run (and caches it locally). For an explicit alternate Model2Vec model, use:
 
 ```bash
-uv run semlint ./skills --model minishlab/potion-base-8M --threshold 0.90
+semlint ./skills --model minishlab/potion-base-8M --threshold 0.90
 ```
 
 SemHash and Model2Vec run locally on CPU. No API, LLM, vector database, server, or GPU is needed.
