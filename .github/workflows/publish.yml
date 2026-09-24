@@ -1,0 +1,83 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged commit and master history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag points to a commit on master
+        run: |
+          git fetch origin master:refs/remotes/origin/master
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master || {
+            echo "Tag commit is not reachable from master; refusing to publish."
+            exit 1
+          }
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set package version from tag
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          python - "$VERSION" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          version = sys.argv[1]
+          pyproject = Path("pyproject.toml")
+          contents = pyproject.read_text()
+          updated, count = re.subn(
+              r'(?m)^version = "0\.0\.0"$',
+              f'version = "{version}"',
+              contents,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not find the project version placeholder")
+          pyproject.write_text(updated)
+          PY
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/semlint
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+
+      - name: Publish package distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
