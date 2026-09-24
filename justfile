@@ -1,11 +1,10 @@
 placeholder_version := "0.0.0"
-version := `doxxer next`
 
-set-version:
+set-version version:
     @sed -i 's/^version = "{{placeholder_version}}"$/version = "{{version}}"/' pyproject.toml
 
-reset-version:
+reset-version version:
     @sed -i 's/^version = "{{version}}"$/version = "{{placeholder_version}}"/' pyproject.toml
 
-build: set-version && reset-version
-    uv build
+build release_version=`doxxer next`:
+    @just set-version "{{release_version}}" && trap 'just reset-version "{{release_version}}"' EXIT && uv build
