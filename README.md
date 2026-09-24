@@ -8,6 +8,8 @@
 
 It answers: **how many tokens are consuming context without adding unique information, and where are they?**
 
+Why I developed it: **LLMs are very eager (especially the smaller ones) to repeat themselves multiple times in multiple places. I want to have a single source of truth mentioned, so I needed a way to identify those repetitions, so, like a semantic linter. This is also what the name semlint (semantic linter stands for)**
+
 ## Install
 
 Install `semlint` as a global command with [uv](https://docs.astral.sh/uv/):
