@@ -6,9 +6,9 @@
 
 `semlint` is a small, local Python CLI for finding redundant information in agent instruction corpora: `SKILL.md`, `AGENTS.md`, prompts, rules, and other Markdown/text files.
 
-It answers: **how many tokens are consuming context without adding unique information, and where are they?**
+It answers: **how many tokens are potentially consuming context without adding unique information, and where are they?**
 
-Why I developed it: **LLMs are very eager (especially the smaller ones) to repeat themselves multiple times in multiple places. I want to have a single source of truth mentioned, so I needed a way to identify those repetitions, so, like a semantic linter. This is also what the name semlint (semantic linter stands for)**
+Why I developed it: **LLMs are very eager (especially the smaller ones) to repeat themselves multiple times in multiple places. I want to have a single source of truth mentioned, so I needed a way to identify those repetitions, so, like a semantic linter. This is also what the name semlint (semantic linter) stands for**
 
 ## Install
 
@@ -65,7 +65,7 @@ SemHash and Model2Vec run locally on CPU. No API, LLM, vector database, server, 
 - Ignores blocks below `--min-block-tokens`.
 - Clusters likely duplicates without modifying source files.
 
-Similarity is intentionally configurable because generic phrases can be false positives. Review clusters before replacing instructions.
+**Similarity clusters are suggestions, not verdicts.** Semlint groups passages that appear semantically similar based on a configurable similarity threshold. A cluster does not mean its passages are identical or interchangeable, and the similarity score is not a guarantee. Review each passage in context, then decide whether to keep, consolidate, rewrite, or remove anything.
 
 ## Output formats
 
