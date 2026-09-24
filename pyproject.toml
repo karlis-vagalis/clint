@@ -14,6 +14,11 @@ dependencies = [
     "typer>=0.27.2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/karlis-vagalis/semlint"
+Repository = "https://github.com/karlis-vagalis/semlint"
+Issues = "https://github.com/karlis-vagalis/semlint/issues"
+
 [project.scripts]
 semlint = "semlint.cli:main"
 
