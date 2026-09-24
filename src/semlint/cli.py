@@ -109,9 +109,9 @@ def _command_entry(
 def discover_commands() -> list[dict[str, Any]]:
     """Describe executable commands from the registered Typer/Click tree."""
     scan_command = get_command(app)
-    entries = [_command_entry(cast(TyperCommand | TyperGroup, scan_command), "clint")]
+    entries = [_command_entry(cast(TyperCommand | TyperGroup, scan_command), "semlint")]
     root = get_command(discovery_app)
-    root_context = Context(root, info_name="clint")
+    root_context = Context(root, info_name="semlint")
 
     def visit(group: TyperGroup, prefix: str, parent: Context) -> None:
         for name, command in group.commands.items():
@@ -123,7 +123,7 @@ def discover_commands() -> list[dict[str, Any]]:
                 entries.append(_command_entry(command, command_path))
 
     if isinstance(root, TyperGroup):
-        visit(root, "clint", root_context)
+        visit(root, "semlint", root_context)
     return entries
 
 
@@ -200,7 +200,7 @@ def scan(
             ),
         )
     except (OSError, RuntimeError, ImportError) as exc:
-        typer.echo(f"clint: {exc}", err=True)
+        typer.echo(f"semlint: {exc}", err=True)
         raise typer.Exit(2) from exc
     typer.echo(
         render_json(report, limit=limit, sort=sort)

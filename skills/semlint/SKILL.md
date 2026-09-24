@@ -1,31 +1,31 @@
 ---
-name: clint
-description: Use the local `clint` CLI to find and quantify redundant information in agent instruction corpora, including SKILL.md, AGENTS.md, prompts, and text rules. Trigger when the user asks to audit instruction files, locate repeated rules, estimate context-token savings, inspect duplication, or enforce a redundancy threshold in CI. Prefer this skill whenever such a corpus needs analysis, even if the user does not name clint.
+name: semlint
+description: Use the local `semlint` CLI to find and quantify redundant information in agent instruction corpora, including SKILL.md, AGENTS.md, prompts, and text rules. Trigger when the user asks to audit instruction files, locate repeated rules, estimate context-token savings, inspect duplication, or enforce a redundancy threshold in CI. Prefer this skill whenever such a corpus needs analysis, even if the user does not name semlint.
 ---
 
-# Analyze instruction corpora with clint
+# Analyze instruction corpora with semlint
 
-Use `clint` to locate likely duplicate instruction paragraphs and estimate their context cost. The tool is read-only: it reports candidates and never edits the scanned files.
+Use `semlint` to locate likely duplicate instruction paragraphs and estimate their context cost. The tool is read-only: it reports candidates and never edits the scanned files.
 
 ## Discover the current CLI
 
-The command list is generated from clint's registered Typer definitions. If unsure about a flag or syntax, run:
+The command list is generated from semlint's registered Typer definitions. If unsure about a flag or syntax, run:
 
 ```bash
-clint self list
-clint --help
+semlint self list
+semlint --help
 ```
 
-Use `uv run clint` when working from this repository and the global `clint` command is unavailable. The repository's `just build` builds a versioned package, not a scan; do not run it just to inspect a corpus.
+Use `uv run semlint` when working from this repository and the global `semlint` command is unavailable. The repository's `just build` builds a versioned package, not a scan; do not run it just to inspect a corpus.
 
 ## Run a scan
 
-Pass one or more exact paths, directories, or glob patterns. Quote globs so clint—not the invoking shell—expands them consistently:
+Pass one or more exact paths, directories, or glob patterns. Quote globs so semlint—not the invoking shell—expands them consistently:
 
 ```bash
-clint ./skills
-clint ./skills ./rules/AGENTS.md
-clint './skills/**/*.md' './prompts/*.txt'
+semlint ./skills
+semlint ./skills ./rules/AGENTS.md
+semlint './skills/**/*.md' './prompts/*.txt'
 ```
 
 The default `--split auto` mode uses Markdown parsing for `.md` files and blank-line paragraph splitting for other supported text files. Markdown boundaries include paragraphs (including list and blockquote paragraphs), fenced/indented code, HTML blocks, and tables; headings and front matter are not treated as instruction blocks. Use `--split paragraph` to force blank-line splitting or `--split markdown` to force Markdown parsing.
@@ -33,7 +33,7 @@ The default `--split auto` mode uses Markdown parsing for `.md` files and blank-
 The default output is readable terminal text. Use JSON when the user or a downstream script needs structured output:
 
 ```bash
-clint ./skills --output json
+semlint ./skills --output json
 ```
 
 Useful controls:
@@ -49,7 +49,7 @@ Useful controls:
 Example CI check:
 
 ```bash
-clint ./skills ./AGENTS.md --fail-above 0.10 --output json
+semlint ./skills ./AGENTS.md --fail-above 0.10 --output json
 ```
 
 Use a ratio such as `0.10`, not a percentage such as `10`.
@@ -63,4 +63,4 @@ Use a ratio such as `0.10`, not a percentage such as `10`.
 - A first semantic run may need to download and cache the local Model2Vec model. It runs locally on CPU afterward; there is no external LLM or API call.
 - Overlapping input paths are deduplicated. Unmatched paths or globs are errors rather than silently ignored.
 
-Do not edit instruction files just because clint reports a cluster. If the user asks to consolidate rules, inspect every occurrence, identify the actual shared invariant, preserve meaningful differences, and make edits only within the user's requested scope. Otherwise, present findings and let the user decide what to change.
+Do not edit instruction files just because semlint reports a cluster. If the user asks to consolidate rules, inspect every occurrence, identify the actual shared invariant, preserve meaningful differences, and make edits only within the user's requested scope. Otherwise, present findings and let the user decide what to change.

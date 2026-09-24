@@ -1,5 +1,5 @@
 [project]
-name = "clint"
+name = "semlint"
 version = "0.0.0"
 description = "Find semantic redundancy in agent instruction corpora."
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-clint = "clint.cli:main"
+semlint = "semlint.cli:main"
 
 [dependency-groups]
 dev = [

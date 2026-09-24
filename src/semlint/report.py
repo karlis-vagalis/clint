@@ -128,7 +128,7 @@ def render(
         width=100,
         highlight=False,
     )
-    console.print(Rule("clint · instruction redundancy report", style="bright_blue"))
+    console.print(Rule("semlint · instruction redundancy report", style="bright_blue"))
 
     summary = Table(show_header=False, box=None, padding=(0, 2))
     summary.add_column("Metric", style="cyan")
